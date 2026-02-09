@@ -6,6 +6,8 @@ import os
 import tempfile
 from typing import List, Dict
 from threading import Lock
+from collections import Counter
+
 class Token:
     def __init__(self, text: str):
         self.text = text.lower()
@@ -161,10 +163,17 @@ def is_valid(url):
 
         pathParts = [p for p in parsed.path.split('/') if p]
         if len(pathParts) > 2:
-            from collections import Counter
             counts = Counter(pathParts)
             if any(count >= 3 for count in counts.values()):
                 return False
+            
+        if parsed.query:
+            query_params = parsed.query.split('&')
+            if len(query_params) > 3:
+                return False
+            key_counts = Counter([param.split('=')[0] for param in query_params])
+            if any(count > 1 for count in key_counts.values()):
+                 return False
 
         if len(url) > 300:
             return False
