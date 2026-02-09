@@ -128,12 +128,18 @@ def extract_next_links(url, resp):
         soup = BeautifulSoup(resp.raw_response.content, 'lxml')
     except Exception:
         return []
+    
+    pageUrl = urldefrag(getattr(resp, "url", url) or url)[0]
+    expand = True
+
     try:
-        expand = updateStatistics(url, soup)
-        if not expand:
-            return []
+        expand = updateStatistics(pageUrl, soup)
+
     except Exception as e:
-        print(f"Error updating stats for {url}: {e}")
+        print(f"Error updating stats for {pageUrl}: {e}")
+    
+    if not expand:
+        return []
 
     extractedLinks = set()
 
@@ -142,7 +148,7 @@ def extract_next_links(url, resp):
         if not href:
             continue
         hrefNoFrag = urldefrag(href)[0]
-        fullUrl = urljoin(url, hrefNoFrag)
+        fullUrl = urljoin(pageUrl, hrefNoFrag)
         extractedLinks.add(fullUrl)    
 
     return list(extractedLinks)
