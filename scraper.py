@@ -24,48 +24,39 @@ class Token:
     def __repr__(self):
         return f"Token('{self.text}')"
 
-def tokenize(textFilePath: str) -> List[Token]:
-    """
-    Parses a file and returns a list of Tokens.
-    """
+def tokenizeText(text: str) -> List[Token]:
     tokens = []
     try:
-        with open(textFilePath, 'r', encoding='utf-8', errors='replace') as file:
-            for line in file:
-                currentToken = []
-                
-                for char in line:
-                    try:
-                        if (char.isalnum() and char.isascii()):
-                            currentToken.append(char)
-                        else:
-                            if currentToken:
-                                tokenStr = ''.join(currentToken)
-                                if tokenStr:
-                                    tokens.append(Token(tokenStr))
-                                currentToken = []
-                    except Exception:
+        for line in text.split('\n'):
+            currentToken = []
+            
+            for char in line:
+                try:
+                    if (char.isalnum() and char.isascii()):
+                        currentToken.append(char)
+                    else:
                         if currentToken:
                             tokenStr = ''.join(currentToken)
                             if tokenStr:
                                 tokens.append(Token(tokenStr))
                             currentToken = []
-                        continue
-                if currentToken:
-                    tokenStr = ''.join(currentToken)
-                    if tokenStr:
-                        tokens.append(Token(tokenStr)) 
-    except FileNotFoundError:
-        print(f"Error: File '{textFilePath}' not found.", file=sys.stderr)
+                except Exception:
+                    if currentToken:
+                        tokenStr = ''.join(currentToken)
+                        if tokenStr:
+                            tokens.append(Token(tokenStr))
+                        currentToken = []
+                    continue
+            if currentToken:
+                tokenStr = ''.join(currentToken)
+                if tokenStr:
+                    tokens.append(Token(tokenStr))
     except Exception as e:
-        print(f"Error reading file: {e}", file=sys.stderr)
+        print(f"Error tokenizing text: {e}", file=sys.stderr)
     
     return tokens
 
 def computeWordFrequencies(tokenList: List[Token]) -> Dict[Token, int]:
-    """
-    Counts the frequency of each token in the list.
-    """
     frequencies = {}
     for token in tokenList:
         if token in frequencies:
@@ -195,15 +186,7 @@ def updateStatistics(url, soup):
         subdomain = parsed.netloc.lower()
     
     textContent = soup.get_text()
-    
-    fd, tempPath = tempfile.mkstemp(text=True)
-    tokens = []
-    try:
-        with os.fdopen(fd, 'w', encoding='utf-8') as tmp:
-            tmp.write(textContent)
-        tokens = tokenize(tempPath)
-    finally:
-        os.remove(tempPath)
+    tokens = tokenizeText(textContent)
 
     validTokens = [t for t in tokens if t.text not in stopWords and len(t.text) > 1]
     tokenCount = len(validTokens)
