@@ -75,6 +75,17 @@ stats = {
 
 statsLock = Lock()
 
+seen_lock = Lock()
+seen_urls = set()
+
+def check_if_seen(url: str) -> bool:
+    current_url = urldefrag(url)[0]
+    with seen_lock:
+        if current_url in seen_urls:
+            return True
+        seen_urls.add(current_url)
+        return False
+
 stopWords = set([
     "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at",
     "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "can't", "cannot", "could",
@@ -116,7 +127,9 @@ def extract_next_links(url, resp):
     except Exception:
         return []
     try:
-        updateStatistics(url, soup)
+        expand = updateStatistics(url, soup)
+        if not expand:
+            return []
     except Exception as e:
         print(f"Error updating stats for {url}: {e}")
 
@@ -180,6 +193,9 @@ def is_valid(url):
         raise
 
 def updateStatistics(url, soup):
+    if check_if_seen(url):
+        return False
+
     parsed = urlparse(url)
     subdomain = None
     if "uci.edu" in parsed.netloc:
@@ -208,6 +224,8 @@ def updateStatistics(url, soup):
 
         if stats["uniquePages"] % 25 == 0:
             dumpReport()
+    
+    return True
 
 def dumpReport():
     try:
