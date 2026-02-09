@@ -179,6 +179,15 @@ def is_valid(url):
         netloc = parsed.netloc.lower()
         if not any(netloc.endswith(d) or netloc == d[1:] for d in allowedDomains):
             return False
+        
+        lower_path = parsed.path.lower()
+        lower_query = parsed.query.lower()
+
+        if "search" in lower_path or "calendar" in lower_path:
+            return False
+        
+        if "sort=" in lower_query:
+            return False
 
         pathParts = [p for p in parsed.path.split('/') if p]
         if len(pathParts) > 2:
