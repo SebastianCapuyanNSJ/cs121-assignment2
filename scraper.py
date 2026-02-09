@@ -183,10 +183,13 @@ def is_valid(url):
         lower_path = parsed.path.lower()
         lower_query = parsed.query.lower()
 
-        if "search" in lower_path or "calendar" in lower_path:
+        if "search" in lower_path or "ical" in lower_path:
             return False
         
         if "sort=" in lower_query:
+            return False
+        
+        if "outlook" in lower_query or "ical" in lower_query:
             return False
 
         pathParts = [p for p in parsed.path.split('/') if p]
