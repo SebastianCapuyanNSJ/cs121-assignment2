@@ -147,9 +147,10 @@ def extract_next_links(url, resp):
         href = link.get('href')
         if not href:
             continue
-        hrefNoFrag = urldefrag(href)[0]
-        fullUrl = urljoin(pageUrl, hrefNoFrag)
-        extractedLinks.add(fullUrl)    
+        fullUrl = urljoin(pageUrl, href)
+        cleanUrl = urldefrag(fullUrl)[0]
+        if is_valid(cleanUrl):
+            extractedLinks.add(cleanUrl)
 
     return list(extractedLinks)
 
@@ -183,57 +184,75 @@ def is_valid(url):
         lower_path = parsed.path.lower()
         lower_query = parsed.query.lower()
 
+        if "event" in lower_path:
+            return False
         if "login" in lower_path or "signup" in lower_path or "signin" in lower_path:
             return False
-        
         if "auth" in lower_path or "sso" in lower_path:
             return False
-        
-        if "search" in lower_path or "ical" in lower_path or "events/" in lower_path:
+        if "search" in lower_path or "ical" in lower_path:
             return False
-        
         if "sort=" in lower_query:
             return False
-        
         if "outlook" in lower_query or "ical" in lower_query:
+            return False
+        
+        if re.search(r'\d{4}-\d{2}-\d{2}', lower_path):
+            return False
+        if re.search(r'\d{4}/\d{2}/\d{2}', lower_path):
+            return False
+        if re.search(r'\d{4}\.\d{2}\.\d{2}', lower_path):
+            return False
+        if re.search(r'\d{2}-\d{2}-\d{4}', lower_path):
+            return False
+        if re.search(r'\d{2}/\d{2}/\d{4}', lower_path):
+            return False
+        if re.search(r'\d{4}-\d{2}', lower_path):
+            return False
+        if re.search(r'\d{4}/\d{2}', lower_path):
+            return False
+        if re.search(r'\d{2}-\d{4}', lower_path):
+            return False
+        if re.search(r'\d{2}/\d{4}', lower_path):
+            return False
+        if re.search(r'\d{4}\.\d{2}', lower_path):
+            return False
+        
+        gitTraps = ['commit', 'tree', 'blob', 'diff', 'blame', 'compare']
+        if any(trap in lower_path for trap in gitTraps):
             return False
 
         pathParts = [p for p in parsed.path.split('/') if p]
+
+        if len(pathParts) > 8:
+            return False
         if len(pathParts) > 2:
             counts = Counter(pathParts)
             if any(count >= 3 for count in counts.values()):
                 return False
             
         if parsed.query:
-            loginTraps = {'action', 'login', 'auth', 'sso', 'redirect', 'id', 'token'}
-            query_params_check = parsed.query.split('&')
-            for param in query_params_check:
-                key_check = param.split('=')[0].lower()
-                if key_check in loginTraps:
-                    return False
-                
-            trapKeys = {'tribe-bar-date', 'ical', 'tribe_event_display', 
-                    'date', 'calendar', 'eventdate'}
-        
-            query_params = parsed.query.split('&')
-            for param in query_params:
-                key = param.split('=')[0].lower()
-                if key in trapKeys:
-                    return False
+            loginTraps = {'action', 'login', 'auth', 'sso', 'redirect', 'id', 'token', 'do', 'sectok', 'idx'}
+            calendarTraps = {'tribe-bar-date', 'ical', 'tribe_event_display', 'date', 'calendar', 'eventdate', 'start_date', 'end_date', 'startdate', 'enddate'}
+            sortingTraps = {'sort', 'order', 'orderby', 'search', 'filter', 'limit', 'page', 'p', 'skip', 'take'}
+            miscTraps = {'replytocom', 'share', 'print', 'format', 'feed', 'rss', 'atom', 'lang', 'version'}
             
+            allTraps = loginTraps.union(calendarTraps).union(miscTraps).union(sortingTraps)
             query_params = parsed.query.split('&')
+
             if len(query_params) > 3:
                 return False
-            key_counts = Counter([param.split('=')[0] for param in query_params])
-            if any(count > 1 for count in key_counts.values()):
+            keys = []
+            for param in query_params:
+                key = param.split('=')[0].lower()
+                if any(trap in key for trap in allTraps):
                  return False
+                keys.append(key)
+            if len(keys) != len(set(keys)):
+                return False
 
         if len(url) > 300:
             return False
-
-        if re.search(r'\d{4}/\d{2}/\d{2}', parsed.path):
-            if len(pathParts) > 5:
-                return False
 
         return True
 
