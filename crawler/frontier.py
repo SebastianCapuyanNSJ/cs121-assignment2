@@ -98,7 +98,6 @@ class Frontier(object):
     def mark_url_complete(self, url):
         with self.lock:
             urlhash = get_urlhash(url)
-            # Open, Write, Close.
             with shelve.open(self.config.save_file) as save:
                 if urlhash not in save:
                     self.logger.error(
