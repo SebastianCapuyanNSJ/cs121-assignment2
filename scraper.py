@@ -176,13 +176,19 @@ def is_valid(url):
             ".informatics.uci.edu",
             ".stat.uci.edu"
         ]
-        netloc = parsed.netloc.lower()
+        netloc = parsed.hostname.lower() if parsed.hostname else ""
         if not any(netloc.endswith(d) or netloc == d[1:] for d in allowedDomains):
             return False
         
         lower_path = parsed.path.lower()
         lower_query = parsed.query.lower()
 
+        if "login" in lower_path or "signup" in lower_path or "signin" in lower_path:
+            return False
+        
+        if "auth" in lower_path or "sso" in lower_path:
+            return False
+        
         if "search" in lower_path or "ical" in lower_path:
             return False
         
@@ -199,6 +205,13 @@ def is_valid(url):
                 return False
             
         if parsed.query:
+            loginTraps = {'action', 'login', 'auth', 'sso', 'redirect', 'id', 'token'}
+            query_params_check = parsed.query.split('&')
+            for param in query_params_check:
+                key_check = param.split('=')[0].lower()
+                if key_check in loginTraps:
+                    return False
+                
             trapKeys = {'tribe-bar-date', 'ical', 'tribe_event_display', 
                     'date', 'calendar', 'eventdate'}
         
