@@ -18,37 +18,40 @@ class Frontier(object):
         self.domainQueues = {}   
         self.domainLastAccess = {} 
         self.inProcessCount = 0 
-        
-        if not os.path.exists(self.config.save_file) and not restart:
-            self.logger.info(
-                f"Did not find save file {self.config.save_file}, "
-                f"starting from seed.")
-        elif os.path.exists(self.config.save_file) and restart:
+        self.saved_hashes = set()
+
+        if os.path.exists(self.config.save_file) and restart:
             self.logger.info(
                 f"Found save file {self.config.save_file}, deleting it.")
             os.remove(self.config.save_file)
-            
-        self.save = shelve.open(self.config.save_file)
         
-        if restart:
-            for url in self.config.seed_urls:
-                self.add_url(url)
-        else:
-            self._parse_save_file()
-            if not self.save:
+        with shelve.open(self.config.save_file) as save:
+            if not save:
+                self.logger.info(f"Did not find save file {self.config.save_file} (or it was empty), starting from seed.")
                 for url in self.config.seed_urls:
-                    self.add_url(url)
+                    self._add_url_to_save(save, url)
+            else:
+                self.logger.info(f"Loading state from {self.config.save_file}...")
+                self._parse_save_file(save)
 
-    def _parse_save_file(self):
-        total_count = len(self.save)
-        tbd_count = 0
-        for url, completed in self.save.values():
+    def _parse_save_file(self, save):
+        total_count = len(save)
+        for urlhash, (url, completed) in save.items():
+            self.saved_hashes.add(urlhash)
             if not completed and is_valid(url):
                 self.addToDomainQueue(url)
                 tbd_count += 1
         self.logger.info(
             f"Found {tbd_count} urls to be downloaded from {total_count} "
             f"total urls discovered.")
+
+    def _add_url_to_save(self, save, url):
+        url = normalize(url)
+        urlhash = get_urlhash(url)
+        if urlhash not in self.saved_hashes:
+            save[urlhash] = (url, False)
+            self.saved_hashes.add(urlhash)
+            self.addToDomainQueue(url)
 
     def addToDomainQueue(self, url):
         domain = urlparse(url).netloc
@@ -87,18 +90,20 @@ class Frontier(object):
         with self.lock:
             url = normalize(url)
             urlhash = get_urlhash(url)
-            if urlhash not in self.save:
-                self.save[urlhash] = (url, False)
-                self.save.sync()
-                self.addToDomainQueue(url)
+            if urlhash in self.saved_hashes:
+                return
+            with shelve.open(self.config.save_file) as save:
+                self._add_url_to_save(save, url)
     
     def mark_url_complete(self, url):
         with self.lock:
             urlhash = get_urlhash(url)
-            if urlhash not in self.save:
-                self.logger.error(
-                    f"Completed url {url}, but have not seen it before.")
-
-            self.save[urlhash] = (url, True)
-            self.save.sync()
+            # Open, Write, Close.
+            with shelve.open(self.config.save_file) as save:
+                if urlhash not in save:
+                    self.logger.error(
+                        f"Completed url {url}, but have not seen it before.")
+                else:
+                    save[urlhash] = (url, True)
+            
             self.inProcessCount -= 1
