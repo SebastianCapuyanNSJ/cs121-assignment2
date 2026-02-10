@@ -189,7 +189,7 @@ def is_valid(url):
         if "auth" in lower_path or "sso" in lower_path:
             return False
         
-        if "search" in lower_path or "ical" in lower_path:
+        if "search" in lower_path or "ical" in lower_path or "events/" in lower_path:
             return False
         
         if "sort=" in lower_query:
