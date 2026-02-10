@@ -199,6 +199,15 @@ def is_valid(url):
                 return False
             
         if parsed.query:
+            trapKeys = {'tribe-bar-date', 'ical', 'tribe_event_display', 
+                    'date', 'calendar', 'eventdate'}
+        
+            query_params = parsed.query.split('&')
+            for param in query_params:
+                key = param.split('=')[0].lower()
+                if key in trapKeys:
+                    return False
+            
             query_params = parsed.query.split('&')
             if len(query_params) > 3:
                 return False
