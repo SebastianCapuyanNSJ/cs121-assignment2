@@ -7,6 +7,7 @@ import tempfile
 from typing import List, Dict
 from threading import Lock
 from collections import Counter
+import hashlib
 
 class Token:
     def __init__(self, text: str):
@@ -79,6 +80,7 @@ statsLock = Lock()
 
 seen_lock = Lock()
 seen_urls = set()
+visited_hashes = set()
 
 def check_if_seen(url: str) -> bool:
     current_url = urldefrag(url)[0]
@@ -131,6 +133,16 @@ def extract_next_links(url, resp):
     
     pageUrl = urldefrag(getattr(resp, "url", url) or url)[0]
     expand = True
+
+    text_content = soup.get_text()
+    if len(text_content.split()) < 20:
+        return []
+    
+    fingerprint = hashlib.sha256(text_content.encode('utf-8')).hexdigest()
+    with seen_lock:
+        if fingerprint in visitedHashes:
+            return []
+        visitedHashes.add(fingerprint)
 
     try:
         expand = updateStatistics(pageUrl, soup)
@@ -196,6 +208,8 @@ def is_valid(url):
             return False
         if "outlook" in lower_query or "ical" in lower_query:
             return False
+        if "calendar" in lower_path:
+            return False
         
         if re.search(r'\d{4}-\d{2}-\d{2}', lower_path):
             return False
@@ -246,7 +260,7 @@ def is_valid(url):
             for param in query_params:
                 key = param.split('=')[0].lower()
                 if any(trap in key for trap in allTraps):
-                 return False
+                    return False
                 keys.append(key)
             if len(keys) != len(set(keys)):
                 return False
