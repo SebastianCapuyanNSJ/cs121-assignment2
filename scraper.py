@@ -80,7 +80,7 @@ statsLock = Lock()
 
 seen_lock = Lock()
 seen_urls = set()
-visited_hashes = set()
+visitedHashes = set()
 
 def check_if_seen(url: str) -> bool:
     current_url = urldefrag(url)[0]
@@ -250,8 +250,9 @@ def is_valid(url):
             calendarTraps = {'tribe-bar-date', 'ical', 'tribe_event_display', 'date', 'calendar', 'eventdate', 'start_date', 'end_date', 'startdate', 'enddate'}
             sortingTraps = {'sort', 'order', 'orderby', 'search', 'filter', 'limit', 'page', 'p', 'skip', 'take'}
             miscTraps = {'replytocom', 'share', 'print', 'format', 'feed', 'rss', 'atom', 'lang', 'version'}
-            
-            allTraps = loginTraps.union(calendarTraps).union(miscTraps).union(sortingTraps)
+            sessionKeys = {"sessionid", "sid", "phpsessid", "jsessionid","asp-session-id", "aspsessionid"}
+            allTraps = loginTraps.union(calendarTraps).union(miscTraps).union(sortingTraps).union(sessionKeys)
+
             query_params = parsed.query.split('&')
 
             if len(query_params) > 3:
@@ -304,7 +305,7 @@ def updateStatistics(url, soup):
             word = tokenObj.text
             stats["wordFrequencies"][word] = stats["wordFrequencies"].get(word, 0) + count
 
-        if stats["uniquePages"] % 25 == 0:
+        if stats["uniquePages"] % 5 == 0:
             dumpReport()
     
     return True
