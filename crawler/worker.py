@@ -18,11 +18,13 @@ class Worker(Thread):
         
     def run(self):
         while True:
+
+            # get next url & try to download
             tbdUrl = self.frontier.get_tbd_url()
             if not tbdUrl:
                 self.logger.info("Frontier is empty. Stopping Crawler.")
                 break
-
+            
             try:
                 resp = download(tbdUrl, self.config, self.logger)
             except Exception as e:
@@ -36,11 +38,13 @@ class Worker(Thread):
                 f"using cache {self.config.cache_server}.")
             
             try:
+                # extract links from page and add to frontier
                 scrapedUrls = scraper.scraper(tbdUrl, resp)
                 for scrapedUrl in scrapedUrls:
                     self.frontier.add_url(scrapedUrl)
             except Exception as e:
                 self.logger.error(f"Error scraping {tbdUrl}: {e}")
+            # mark url as finished so frontier can continue
             finally:
                 self.frontier.mark_url_complete(tbdUrl)
                 time.sleep(self.config.time_delay)
