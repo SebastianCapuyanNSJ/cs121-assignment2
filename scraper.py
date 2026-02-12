@@ -9,7 +9,9 @@ from threading import Lock
 from collections import Counter
 import hashlib
 
+# token class for efficient token handling, comparison, and representation
 class Token:
+    # tokens are not case-sensitive
     def __init__(self, text: str):
         self.text = text.lower()
     
@@ -35,6 +37,7 @@ def tokenizeText(text: str) -> List[Token]:
             
             for char in line:
                 try:
+                    # only alphanumeric ascii characters are counted, split on everything else
                     if (char.isalnum() and char.isascii()):
                         currentToken.append(char)
                     else:
@@ -60,6 +63,7 @@ def tokenizeText(text: str) -> List[Token]:
     return tokens
 
 def computeWordFrequencies(tokenList: List[Token]) -> Dict[Token, int]:
+    # frequency table for report
     frequencies = {}
     for token in tokenList:
         if token in frequencies:
@@ -68,6 +72,7 @@ def computeWordFrequencies(tokenList: List[Token]) -> Dict[Token, int]:
             frequencies[token] = 1
     return frequencies
 
+# report stats
 stats = {
     "uniquePages": 0,
     "longestPageUrl": "",
@@ -76,12 +81,13 @@ stats = {
     "subdomains": {}
 }
 
+# locks to protect shared globals while multithreading
 statsLock = Lock()
-
 seen_lock = Lock()
 seen_urls = set()
 visitedHashes = set()
 
+# remove fragments to only crawl unique pages
 def check_if_seen(url: str) -> bool:
     current_url = urldefrag(url)[0]
     with seen_lock:
@@ -90,6 +96,7 @@ def check_if_seen(url: str) -> bool:
         seen_urls.add(current_url)
         return False
 
+# don't count stop words in stats
 stopWords = set([
     "a", "about", "above", "after", "again", "against", "all", "am", "an", "and", "any", "are", "aren't", "as", "at",
     "be", "because", "been", "before", "being", "below", "between", "both", "but", "by", "can't", "cannot", "could",
@@ -112,15 +119,7 @@ def scraper(url, resp):
     return [link for link in links if is_valid(link)]
 
 def extract_next_links(url, resp):
-    # Implementation required.
-    # url: the URL that was used to get the page
-    # resp.url: the actual url of the page
-    # resp.status: the status code returned by the server. 200 is OK, you got the page. Other numbers mean that there was some kind of problem.
-    # resp.error: when status is not 200, you can check the error here, if needed.
-    # resp.raw_response: this is where the page actually is. More specifically, the raw_response has two parts:
-    #         resp.raw_response.url: the url, again
-    #         resp.raw_response.content: the content of the page!
-    # Return a list with the hyperlinks (as strings) scrapped from resp.raw_response.content
+    # skip non-200 responses
     if resp.status != 200:
         return []
     if not resp.raw_response or not resp.raw_response.content:
@@ -134,10 +133,12 @@ def extract_next_links(url, resp):
     pageUrl = urldefrag(getattr(resp, "url", url) or url)[0]
     expand = True
 
+    # skip pages with low amounts of text content
     text_content = soup.get_text()
     if len(text_content.split()) < 20:
         return []
     
+    # prevent crawling pages with duplicate content by hashing text
     fingerprint = hashlib.sha256(text_content.encode('utf-8')).hexdigest()
     with seen_lock:
         if fingerprint in visitedHashes:
@@ -145,6 +146,7 @@ def extract_next_links(url, resp):
         visitedHashes.add(fingerprint)
 
     try:
+        # only expand if we haven't seen this url
         expand = updateStatistics(pageUrl, soup)
 
     except Exception as e:
@@ -155,6 +157,7 @@ def extract_next_links(url, resp):
 
     extractedLinks = set()
 
+    # remove fragments from links, check if domain is valid
     for link in soup.find_all('a'):
         href = link.get('href')
         if not href:
@@ -167,6 +170,7 @@ def extract_next_links(url, resp):
     return list(extractedLinks)
 
 def is_valid(url):
+    # checks for http/s, UCI domains, HTML resources, avoid login, search, git, and calendar traps
     try:
         parsed = urlparse(url)
         if parsed.scheme not in set(["http", "https"]):
@@ -211,6 +215,7 @@ def is_valid(url):
         if "calendar" in lower_path:
             return False
         
+        # skip urls with dates (calendar traps)
         if re.search(r'\d{4}-\d{2}-\d{2}', lower_path):
             return False
         if re.search(r'\d{4}/\d{2}/\d{2}', lower_path):
@@ -238,6 +243,7 @@ def is_valid(url):
 
         pathParts = [p for p in parsed.path.split('/') if p]
 
+        # avoid auto-generated/repeated url loops
         if len(pathParts) > 8:
             return False
         if len(pathParts) > 2:
@@ -276,6 +282,7 @@ def is_valid(url):
         raise
 
 def updateStatistics(url, soup):
+    # update global stats for assignment report
     if check_if_seen(url):
         return False
 
@@ -311,6 +318,7 @@ def updateStatistics(url, soup):
     return True
 
 def dumpReport():
+    # uses stats globals to write the report
     try:
         with open("crawler_report.txt", "w", encoding="utf-8") as f:
             f.write(f"Total Unique Pages Found: {stats['uniquePages']}\n")
