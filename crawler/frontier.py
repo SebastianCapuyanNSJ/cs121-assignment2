@@ -14,6 +14,7 @@ class Frontier(object):
         self.logger = get_logger("FRONTIER")
         self.config = config
         
+        # lock to protect domainQueues, domainLastAccess, inProcessCount, and saved_hashes
         self.lock = RLock()
         self.domainQueues = {}   
         self.domainLastAccess = {} 
@@ -25,6 +26,7 @@ class Frontier(object):
                 f"Found save file {self.config.save_file}, deleting it.")
             os.remove(self.config.save_file)
         
+        # shelve db for resuming crawl if interrupted
         with shelve.open(self.config.save_file) as save:
             if not save:
                 self.logger.info(f"Did not find save file {self.config.save_file} (or it was empty), starting from seed.")
@@ -34,6 +36,7 @@ class Frontier(object):
                 self.logger.info(f"Loading state from {self.config.save_file}...")
                 self._parse_save_file(save)
 
+    # load old saved urls, add unfinished urls to queue
     def _parse_save_file(self, save):
         total_count = len(save)
         for urlhash, (url, completed) in save.items():
@@ -45,6 +48,7 @@ class Frontier(object):
             f"Found {tbd_count} urls to be downloaded from {total_count} "
             f"total urls discovered.")
 
+    # only save and queue url if we haven't crawled already
     def _add_url_to_save(self, save, url):
         url = normalize(url)
         urlhash = get_urlhash(url)
@@ -53,12 +57,14 @@ class Frontier(object):
             self.saved_hashes.add(urlhash)
             self.addToDomainQueue(url)
 
+    # group urls by domain for politeness and add to queue
     def addToDomainQueue(self, url):
         domain = urlparse(url).netloc
         if domain not in self.domainQueues:
             self.domainQueues[domain] = []
         self.domainQueues[domain].append(url)
 
+    # pick the next url to crawl with politeness config
     def get_tbd_url(self):
         while True:
             with self.lock:
@@ -95,6 +101,7 @@ class Frontier(object):
             with shelve.open(self.config.save_file) as save:
                 self._add_url_to_save(save, url)
     
+    # manage inProcessCount after worker finishes crawling a url
     def mark_url_complete(self, url):
         with self.lock:
             urlhash = get_urlhash(url)
